@@ -5,106 +5,159 @@
   <title>AURIX TrailGuard — 3D Campus Block Grid & Camera Simulation</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, sans-serif; }
-    body { overflow: hidden; background: #14221a; color: #fff; user-select: none; }
-    canvas { display: block; }
+    body {
+      width: 100vw; height: 100vh; overflow: hidden;
+      background: #0d1913; color: #fff; user-select: none;
+      display: grid;
+      grid-template-rows: auto 1fr auto;
+      grid-template-columns: 1fr 290px;
+    }
 
-    /* Top HUD */
-    #top-hud {
-      position: absolute; top: 14px; left: 14px; right: 14px;
-      display: flex; justify-content: space-between; align-items: flex-start;
-      pointer-events: none; z-index: 10;
+    /* 1. SLIM TOP HEADER BAR (No overlap with 3D world) */
+    #top-bar {
+      grid-column: 1 / 3;
+      background: #0f1e17;
+      border-bottom: 2px solid #2ecc71;
+      padding: 8px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 16px; z-index: 10;
     }
-    .glass-panel {
-      background: rgba(12, 22, 17, 0.86);
-      border: 2px solid #2ecc71;
-      border-radius: 14px;
-      padding: 14px 18px;
-      box-shadow: 0 8px 28px rgba(0,0,0,0.55);
-      pointer-events: auto;
-      backdrop-filter: blur(8px);
-    }
-    h1 { font-size: 17px; letter-spacing: 1px; color: #2ecc71; text-transform: uppercase; }
-    .subtitle { font-size: 12px; color: #a3c2ad; margin-top: 3px; max-width: 560px; }
+    .brand-wrap { display: flex; flex-direction: column; gap: 2px; }
+    h1 { font-size: 15px; letter-spacing: 0.8px; color: #2ecc71; text-transform: uppercase; }
+    .subtitle { font-size: 11.5px; color: #a3c2ad; }
 
     /* Pipeline Stages */
-    #pipeline-stages { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+    #pipeline-stages { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
     .stage-pill {
-      padding: 5px 11px; border-radius: 18px; font-size: 11px; font-weight: 700;
-      background: rgba(255,255,255,0.07); color: #7f8c8d; border: 1px solid #34495e;
-      transition: all 0.25s ease;
+      padding: 4px 10px; border-radius: 14px; font-size: 10.5px; font-weight: 700;
+      background: rgba(255,255,255,0.06); color: #7f8c8d; border: 1px solid #2c3e50;
+      transition: all 0.2s ease;
     }
     .stage-pill.active {
       background: #2ecc71; color: #09140e; border-color: #2ecc71;
-      box-shadow: 0 0 12px rgba(46, 204, 113, 0.75);
+      box-shadow: 0 0 10px rgba(46, 204, 113, 0.7);
     }
     .stage-pill.camera-active {
       background: #00d2d3; color: #071418; border-color: #00d2d3;
-      box-shadow: 0 0 12px rgba(0, 210, 211, 0.75);
+      box-shadow: 0 0 10px rgba(0, 210, 211, 0.7);
     }
     .stage-pill.alert {
       background: #ff4757; color: #fff; border-color: #ff6b81;
-      box-shadow: 0 0 14px rgba(255, 71, 87, 0.85);
+      box-shadow: 0 0 12px rgba(255, 71, 87, 0.8);
     }
 
-    /* Legend Bar */
+    /* Legend + Single Circular Pause Button on Right of Header */
+    .header-right { display: flex; align-items: center; gap: 14px; }
     .legend-bar {
-      display: flex; gap: 12px; margin-top: 10px; padding-top: 8px;
-      border-top: 1px solid rgba(255,255,255,0.12); font-size: 11px; color: #d1f2eb;
+      display: flex; gap: 10px; font-size: 11px; color: #d1f2eb;
+      background: rgba(255,255,255,0.04); padding: 5px 10px; border-radius: 8px;
     }
-    .legend-item { display: flex; align-items: center; gap: 5px; }
-    .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .legend-item { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 
-    /* Telemetry & Camera Feed Panel */
-    #telemetry-panel { width: 350px; }
-    .metric-row { display: flex; justify-content: space-between; font-size: 12.5px; margin: 5px 0; }
-    .metric-val { font-weight: 700; color: #2ecc71; font-family: monospace; font-size: 13px; }
-    #cam-box {
-      margin-top: 8px; padding: 8px 10px; border-radius: 8px;
-      background: rgba(0, 210, 211, 0.12); border: 1px solid #00d2d3;
-      font-family: monospace; font-size: 11.5px; color: #dff9fb;
+    /* Single Circular Pause/Resume Button (Reference Image 1 Style) */
+    #hud-pause-circle {
+      width: 42px; height: 42px; border-radius: 50%;
+      background: rgba(12, 24, 18, 0.95);
+      border: 3px solid #2ecc71;
+      box-shadow: 0 0 12px rgba(46, 204, 113, 0.5);
+      color: #fff; font-size: 16px; font-weight: 800;
+      display: flex; justify-content: center; align-items: center;
+      cursor: pointer; transition: all 0.2s ease; flex-shrink: 0;
     }
-    #log-box {
-      margin-top: 8px; height: 105px; overflow-y: auto;
-      background: rgba(0,0,0,0.5); border-radius: 8px; padding: 8px;
-      font-family: monospace; font-size: 11px; color: #d1f2eb; line-height: 1.45;
+    #hud-pause-circle:hover {
+      transform: scale(1.06);
+      background: #2ecc71; color: #09140e;
+    }
+    #hud-pause-circle.paused {
+      border-color: #f39c12;
+      background: rgba(243, 156, 18, 0.2);
+      color: #f39c12;
+      box-shadow: 0 0 14px rgba(243, 156, 18, 0.75);
     }
 
-    /* Bottom-Left Speedometer & Motion State HUD (Ref 1 Style) */
+    /* 2. DEDICATED 3D STAGE CONTAINER (100% Unobstructed) */
+    #viewport-container {
+      grid-column: 1 / 2;
+      grid-row: 2 / 3;
+      position: relative;
+      width: 100%; height: 100%;
+      overflow: hidden;
+    }
+    canvas { display: block; width: 100%; height: 100%; }
+
+    /* Compact Corner Speedometer inside 3D Viewport (Bottom-Left) */
     #speed-hud {
-      position: absolute; bottom: 22px; left: 22px;
-      display: flex; align-items: center; gap: 14px; z-index: 10;
+      position: absolute; bottom: 14px; left: 14px;
+      display: flex; align-items: center; gap: 10px;
+      pointer-events: none; z-index: 5;
     }
     .speed-circle {
-      width: 96px; height: 96px; border-radius: 50%;
-      background: rgba(12, 24, 18, 0.9);
-      border: 4px solid #2ecc71;
-      box-shadow: 0 0 18px rgba(46, 204, 113, 0.5);
+      width: 74px; height: 74px; border-radius: 50%;
+      background: rgba(12, 24, 18, 0.88);
+      border: 3px solid #2ecc71;
+      box-shadow: 0 0 14px rgba(46, 204, 113, 0.45);
       display: flex; flex-direction: column; justify-content: center; align-items: center;
     }
-    .speed-num { font-size: 25px; font-weight: 800; color: #fff; }
-    .speed-unit { font-size: 10px; color: #2ecc71; text-transform: uppercase; }
+    .speed-num { font-size: 20px; font-weight: 800; color: #fff; }
+    .speed-unit { font-size: 9px; color: #2ecc71; text-transform: uppercase; }
     .state-badge {
-      background: rgba(12, 24, 18, 0.9); border: 2px solid #00d2d3;
-      padding: 8px 14px; border-radius: 12px; font-family: monospace;
+      background: rgba(12, 24, 18, 0.88); border: 1.5px solid #00d2d3;
+      padding: 6px 11px; border-radius: 10px; font-family: monospace;
     }
-    .state-label { font-size: 10px; color: #81ecec; }
-    .state-val { font-size: 14px; font-weight: 800; color: #fff; margin-top: 2px; }
+    .state-label { font-size: 9px; color: #81ecec; }
+    .state-val { font-size: 12px; font-weight: 800; color: #fff; margin-top: 1px; }
 
-    /* Bottom Controls */
-    #controls-hud {
-      position: absolute; bottom: 22px; right: 22px;
-      display: flex; flex-direction: column; gap: 8px; align-items: flex-end; z-index: 10;
+    /* 3. DEDICATED RIGHT TELEMETRY SIDEBAR (Never blocks the 3D Grid) */
+    #telemetry-sidebar {
+      grid-column: 2 / 3;
+      grid-row: 2 / 3;
+      background: #0f1e17;
+      border-left: 2px solid #2ecc71;
+      padding: 12px 14px;
+      display: flex; flex-direction: column; gap: 6px;
+      overflow: hidden;
     }
-    .btn-group { display: flex; gap: 7px; flex-wrap: wrap; justify-content: flex-end; }
-    button {
-      background: rgba(15, 30, 22, 0.92); color: #ecf0f1;
-      border: 2px solid #2ecc71; border-radius: 10px;
-      padding: 8px 13px; font-size: 11.5px; font-weight: 700; cursor: pointer;
-      transition: all 0.2s;
+    .sidebar-title {
+      font-size: 12px; font-weight: 800; color: #2ecc71;
+      letter-spacing: 0.6px; text-transform: uppercase;
+      padding-bottom: 6px; border-bottom: 1px solid rgba(46, 204, 113, 0.25);
     }
-    button:hover, button.active-case {
+    .metric-row { display: flex; justify-content: space-between; font-size: 12px; margin: 2px 0; }
+    .metric-val { font-weight: 700; color: #2ecc71; font-family: monospace; font-size: 12px; text-align: right; }
+    #cam-box {
+      margin-top: 4px; padding: 8px 10px; border-radius: 8px;
+      background: rgba(0, 210, 211, 0.1); border: 1px solid #00d2d3;
+      font-family: monospace; font-size: 11px; color: #dff9fb; line-height: 1.45;
+    }
+    .log-title { font-size: 11px; color: #a3c2ad; margin-top: 6px; font-weight: 700; }
+    #log-box {
+      flex: 1; overflow-y: auto;
+      background: rgba(0,0,0,0.45); border-radius: 8px; padding: 8px;
+      font-family: monospace; font-size: 10.5px; color: #d1f2eb; line-height: 1.45;
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    /* 4. SLIM BOTTOM CONTROL DOCK */
+    #bottom-bar {
+      grid-column: 1 / 3;
+      grid-row: 3 / 4;
+      background: #0f1e17;
+      border-top: 2px solid #2ecc71;
+      padding: 8px 16px;
+      display: flex; justify-content: space-between; align-items: center;
+      flex-wrap: wrap; gap: 8px; z-index: 10;
+    }
+    .btn-group { display: flex; gap: 6px; flex-wrap: wrap; }
+    button.ctrl-btn {
+      background: rgba(20, 38, 29, 0.95); color: #ecf0f1;
+      border: 1.5px solid #2ecc71; border-radius: 8px;
+      padding: 6px 12px; font-size: 11px; font-weight: 700; cursor: pointer;
+      transition: all 0.18s;
+    }
+    button.ctrl-btn:hover, button.ctrl-btn.active-case {
       background: #2ecc71; color: #09140e;
-      box-shadow: 0 0 12px rgba(46, 204, 113, 0.65);
+      box-shadow: 0 0 10px rgba(46, 204, 113, 0.6);
     }
     button.record-btn { border-color: #ff4757; color: #ff6b81; }
     button.record-btn.recording {
@@ -115,93 +168,107 @@
 </head>
 <body>
 
-  <!-- Top HUD -->
-  <div id="top-hud">
-    <div class="glass-panel">
+  <!-- 1. TOP HEADER BAR -->
+  <div id="top-bar">
+    <div class="brand-wrap">
       <h1>AURIX TrailGuard // Multi-Block Grid & AI Camera Simulation</h1>
       <div class="subtitle" id="case-title">12-Intersection Campus Block Network with Node Buttons + CCTV Motion/Bearing Detection</div>
-      <div id="pipeline-stages">
-        <div class="stage-pill" id="pill-btn">1. SOS BUTTON TRIGGER</div>
-        <div class="stage-pill" id="pill-cam">2. NODE CAMERA LOCK (MOTION + VECTOR)</div>
-        <div class="stage-pill" id="pill-report">3. TELEMETRY PACKET</div>
-        <div class="stage-pill" id="pill-analyze">4. BLOCK GRAPH PATH ANALYZER</div>
-      </div>
+    </div>
+
+    <div id="pipeline-stages">
+      <div class="stage-pill" id="pill-btn">1. SOS BUTTON</div>
+      <div class="stage-pill" id="pill-cam">2. CAMERA LOCK</div>
+      <div class="stage-pill" id="pill-report">3. TELEMETRY PACKET</div>
+      <div class="stage-pill" id="pill-analyze">4. PATH ANALYZER</div>
+    </div>
+
+    <div class="header-right">
       <div class="legend-bar">
-        <div class="legend-item"><span class="dot" style="background:#3498db;"></span> Ground Truth Route</div>
-        <div class="legend-item"><span class="dot" style="background:#2ecc71;"></span> Verified Button Segment</div>
-        <div class="legend-item"><span class="dot" style="background:#00d2d3;"></span> Dijkstra + Camera Inferred</div>
-        <div class="legend-item"><span class="dot" style="background:#ff4757;"></span> Ambiguous Branching Paths</div>
+        <div class="legend-item"><span class="dot" style="background:#3498db;"></span> Ground Truth</div>
+        <div class="legend-item"><span class="dot" style="background:#2ecc71;"></span> Verified</div>
+        <div class="legend-item"><span class="dot" style="background:#00d2d3;"></span> Inferred</div>
+        <div class="legend-item"><span class="dot" style="background:#ff4757;"></span> Ambiguous</div>
       </div>
-    </div>
-
-    <div class="glass-panel" id="telemetry-panel">
-      <div class="metric-row"><span>Active Scenario:</span><span class="metric-val" id="m-case">Case 2</span></div>
-      <div class="metric-row"><span>Buttons Pressed:</span><span class="metric-val" id="m-pressed">0</span></div>
-      <div class="metric-row"><span>Skipped Intersections:</span><span class="metric-val" id="m-skipped">0</span></div>
-      <div class="metric-row"><span>Possible Grid Branches:</span><span class="metric-val" id="m-branches">1</span></div>
-      <div class="metric-row"><span>Route Recovery Rate:</span><span class="metric-val" id="m-recovery">0.0%</span></div>
-      <div id="cam-box">
-        <div>📹 <b>ACTIVE NODE CCTV:</b> <span id="cam-id">NONE</span></div>
-        <div>🎯 <b>SUBJECT STATE:</b> <span id="cam-motion">SCANNING...</span></div>
-        <div>🧭 <b>EXIT VECTOR:</b> <span id="cam-vector">N/A</span></div>
-      </div>
-      <div id="log-box"></div>
+      <!-- ONLY Pause/Resume Button -->
+      <button id="hud-pause-circle" title="Pause / Resume (Spacebar)" onclick="togglePause()">⏸</button>
     </div>
   </div>
 
-  <!-- Bottom-Left Speedometer & Camera Motion State HUD -->
-  <div id="speed-hud">
-    <div class="speed-circle">
-      <div class="speed-num" id="speed-val">0.0</div>
-      <div class="speed-unit">km/h</div>
-    </div>
-    <div class="state-badge">
-      <div class="state-label">CCTV AI CLASSIFIER</div>
-      <div class="state-val" id="hud-classifier">IDLE</div>
+  <!-- 2. UNOBSTRUCTED 3D VIEWPORT -->
+  <div id="viewport-container">
+    <div id="speed-hud">
+      <div class="speed-circle">
+        <div class="speed-num" id="speed-val">0.0</div>
+        <div class="speed-unit">km/h</div>
+      </div>
+      <div class="state-badge">
+        <div class="state-label">CCTV AI CLASSIFIER</div>
+        <div class="state-val" id="hud-classifier">IDLE</div>
+      </div>
     </div>
   </div>
 
-  <!-- Bottom Controls -->
-  <div id="controls-hud">
+  <!-- 3. RIGHT TELEMETRY SIDEBAR -->
+  <div id="telemetry-sidebar">
+    <div class="sidebar-title">Live Telemetry & Path State</div>
+    <div class="metric-row"><span>Active Scenario:</span><span class="metric-val" id="m-case">Case 4</span></div>
+    <div class="metric-row"><span>Buttons Pressed:</span><span class="metric-val" id="m-pressed">0</span></div>
+    <div class="metric-row"><span>Skipped Nodes:</span><span class="metric-val" id="m-skipped">0</span></div>
+    <div class="metric-row"><span>Grid Branches:</span><span class="metric-val" id="m-branches">1</span></div>
+    <div class="metric-row"><span>Route Recovery:</span><span class="metric-val" id="m-recovery">0.0%</span></div>
+
+    <div id="cam-box">
+      <div>📹 <b>ACTIVE CCTV:</b> <span id="cam-id">NONE</span></div>
+      <div>🎯 <b>STATE:</b> <span id="cam-motion">SCANNING...</span></div>
+      <div>🧭 <b>EXIT VECTOR:</b> <span id="cam-vector">N/A</span></div>
+    </div>
+
+    <div class="log-title">Event & Analyzer Log</div>
+    <div id="log-box"></div>
+  </div>
+
+  <!-- 4. BOTTOM SCENARIO & RECORDING BAR -->
+  <div id="bottom-bar">
     <div class="btn-group">
-      <button onclick="startScenario(1)" id="btn-c1">Case 1: Stationary (Camera Lock)</button>
-      <button onclick="startScenario(2)" id="btn-c2">Case 2: 1 Button + Move (Grid Ambiguity)</button>
-      <button onclick="startScenario(3)" id="btn-c3">Case 3: All Buttons Pressed (Run)</button>
-      <button onclick="startScenario(4)" id="btn-c4">Case 4: Skip Buttons (Camera + Graph Recovery)</button>
+      <button class="ctrl-btn" onclick="startScenario(1)" id="btn-c1">Case 1: Stationary (Camera Lock)</button>
+      <button class="ctrl-btn" onclick="startScenario(2)" id="btn-c2">Case 2: 1 Button + Move (Grid Ambiguity)</button>
+      <button class="ctrl-btn" onclick="startScenario(3)" id="btn-c3">Case 3: All Buttons Pressed (Run)</button>
+      <button class="ctrl-btn" onclick="startScenario(4)" id="btn-c4">Case 4: Skip Buttons (Camera + Graph Recovery)</button>
     </div>
     <div class="btn-group">
-      <button onclick="playAllCases()">▶ Auto-Play All 4 Cases</button>
-      <button onclick="toggleCameraView()">🎥 View: Top-Down Grid / Runner Chase</button>
-      <button class="record-btn" id="rec-btn" onclick="toggleRecording()">⏺ Record Video (.webm)</button>
+      <button class="ctrl-btn" onclick="playAllCases()">▶ Auto-Play All 4 Cases</button>
+      <button class="ctrl-btn" onclick="toggleCameraView()">🎥 View: Top-Down / Runner Chase</button>
+      <button class="ctrl-btn record-btn" id="rec-btn" onclick="toggleRecording()">⏺ Record Video (.webm)</button>
     </div>
   </div>
 
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script>
-    // --- 1. SCENE, CAMERA, RENDERER ---
+    // --- 1. SCENE, CAMERA, RENDERER MOUNTED IN DEDICATED VIEWPORT ---
+    const viewport = document.getElementById('viewport-container');
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x4ca977);
-    scene.fog = new THREE.FogExp2(0x4ca977, 0.0055);
+    scene.fog = new THREE.FogExp2(0x4ca977, 0.0045);
 
-    const camera = new THREE.PerspectiveCamera(44, window.innerWidth / window.innerHeight, 0.1, 600);
+    const camera = new THREE.PerspectiveCamera(42, viewport.clientWidth / viewport.clientHeight, 0.1, 600);
     let viewMode = 'top';
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
-    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setSize(viewport.clientWidth, viewport.clientHeight);
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-    document.body.appendChild(renderer.domElement);
+    viewport.appendChild(renderer.domElement);
 
-    scene.add(new THREE.AmbientLight(0xdff9fb, 0.65));
+    scene.add(new THREE.AmbientLight(0xdff9fb, 0.68));
     const sun = new THREE.DirectionalLight(0xffffff, 0.92);
-    sun.position.set(45, 85, 40);
+    sun.position.set(45, 90, 45);
     sun.castShadow = true;
     sun.shadow.mapSize.width = 2048;
     sun.shadow.mapSize.height = 2048;
     scene.add(sun);
 
     const ground = new THREE.Mesh(
-      new THREE.PlaneGeometry(400, 400),
+      new THREE.PlaneGeometry(450, 450),
       new THREE.MeshLambertMaterial({ color: 0x52b788 })
     );
     ground.rotation.x = -Math.PI / 2;
@@ -209,16 +276,13 @@
     scene.add(ground);
 
     // --- 2. BUILD 3x4 CITY BLOCK STREET GRID (12 INTERSECTION NODES) ---
-    // Rows (Z): r0 = 28 (South), r1 = 0 (Mid), r2 = -28 (North)
-    // Cols (X): c0 = -42, c1 = -14, c2 = 14, c3 = 42
-    const rowsZ = [28, 0, -28];
-    const colsX = [-42, -14, 14, 42];
+    const rowsZ = [26, 0, -26];
+    const colsX = [-40, -13.3, 13.3, 40];
     const gridNodes = {};
     const adjacency = {};
 
     function nodeKey(r, c) { return `N${r}${c}`; }
 
-    // Create helper for road strips
     function createStrip(p1, p2, color, width, yOffset) {
       const dist = p1.distanceTo(p2);
       const geo = new THREE.BoxGeometry(width, 0.14, dist + width * 0.3);
@@ -232,7 +296,6 @@
       return mesh;
     }
 
-    // Populate Grid Nodes, Button Pillars & AI CCTV Camera Poles
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 4; c++) {
         const id = nodeKey(r, c);
@@ -242,17 +305,16 @@
         const nodeGroup = new THREE.Group();
         nodeGroup.position.set(pos.x, 0, pos.z);
 
-        // Intersection Asphalt Pad
         const pad = new THREE.Mesh(
-          new THREE.BoxGeometry(6.4, 0.12, 6.4),
+          new THREE.BoxGeometry(6.2, 0.12, 6.2),
           new THREE.MeshLambertMaterial({ color: 0x7f8fa6 })
         );
         pad.position.y = 0.04;
         nodeGroup.add(pad);
 
-        // 1) Emergency SOS Button Pillar (SW corner of intersection)
+        // 1) Emergency SOS Button Pillar (SW corner)
         const pillarGroup = new THREE.Group();
-        pillarGroup.position.set(-3.8, 0, 3.8);
+        pillarGroup.position.set(-3.6, 0, 3.6);
         const pillar = new THREE.Mesh(
           new THREE.BoxGeometry(0.95, 2.8, 0.95),
           new THREE.MeshLambertMaterial({ color: 0xecf0f1, flatShading: true })
@@ -269,33 +331,31 @@
         pillarGroup.add(beacon);
         nodeGroup.add(pillarGroup);
 
-        // 2) AI CCTV Camera Rig + FOV Vision Cone (NE corner of intersection)
+        // 2) AI CCTV Camera Rig + FOV Vision Cone (NE corner)
         const camGroup = new THREE.Group();
-        camGroup.position.set(3.8, 0, -3.8);
+        camGroup.position.set(3.6, 0, -3.6);
         const pole = new THREE.Mesh(
-          new THREE.CylinderGeometry(0.18, 0.25, 6.2, 6),
+          new THREE.CylinderGeometry(0.18, 0.25, 6.0, 6),
           new THREE.MeshLambertMaterial({ color: 0x2f3640, flatShading: true })
         );
-        pole.position.y = 3.1;
+        pole.position.y = 3.0;
         camGroup.add(pole);
 
         const camHead = new THREE.Mesh(
           new THREE.BoxGeometry(1.1, 0.65, 0.65),
           new THREE.MeshLambertMaterial({ color: 0x00d2d3, flatShading: true })
         );
-        camHead.position.set(-0.4, 6.1, 0.4);
+        camHead.position.set(-0.4, 5.9, 0.4);
         camGroup.add(camHead);
 
-        // Ground Camera FOV Scan Ring
         const fovDisc = new THREE.Mesh(
-          new THREE.RingGeometry(0.6, 5.8, 20),
+          new THREE.RingGeometry(0.6, 5.5, 20),
           new THREE.MeshBasicMaterial({ color: 0x00d2d3, side: THREE.DoubleSide, transparent: true, opacity: 0.14 })
         );
         fovDisc.rotation.x = -Math.PI / 2;
-        fovDisc.position.set(-3.8, 0.16, 3.8);
+        fovDisc.position.set(-3.6, 0.16, 3.6);
         camGroup.add(fovDisc);
 
-        // Button Press Expanding Pulse Ring
         const pulseRing = new THREE.Mesh(
           new THREE.RingGeometry(1.2, 1.8, 20),
           new THREE.MeshBasicMaterial({ color: 0x2ecc71, side: THREE.DoubleSide, transparent: true, opacity: 0 })
@@ -312,20 +372,20 @@
       }
     }
 
-    // Connect Grid Streets (Horizontal & Vertical)
+    // Connect Grid Streets
     for (let r = 0; r < 3; r++) {
       for (let c = 0; c < 4; c++) {
         const u = nodeKey(r, c);
         if (c < 3) {
           const v = nodeKey(r, c + 1);
           adjacency[u].push(v); adjacency[v].push(u);
-          createStrip(gridNodes[u].pos, gridNodes[v].pos, 0x8c7ae6, 5.4, 0.03).material.color.setHex(0x83858c);
+          createStrip(gridNodes[u].pos, gridNodes[v].pos, 0x83858c, 5.2, 0.03);
           createStrip(gridNodes[u].pos, gridNodes[v].pos, 0xf5f6fa, 0.35, 0.07);
         }
         if (r < 2) {
           const v = nodeKey(r + 1, c);
           adjacency[u].push(v); adjacency[v].push(u);
-          createStrip(gridNodes[u].pos, gridNodes[v].pos, 0x83858c, 5.4, 0.03);
+          createStrip(gridNodes[u].pos, gridNodes[v].pos, 0x83858c, 5.2, 0.03);
           createStrip(gridNodes[u].pos, gridNodes[v].pos, 0xf5f6fa, 0.35, 0.07);
         }
       }
@@ -341,44 +401,40 @@
       trunk.position.y = 0.9 * s;
       g.add(trunk);
       const foliage = new THREE.Mesh(
-        new THREE.IcosahedronGeometry(1.8 * s, 0),
+        new THREE.IcosahedronGeometry(1.7 * s, 0),
         new THREE.MeshLambertMaterial({ color: 0x1dd1a1, flatShading: true })
       );
-      foliage.position.y = 2.7 * s;
+      foliage.position.y = 2.6 * s;
       foliage.castShadow = true;
       g.add(foliage);
       g.position.set(x, 0, z);
       scene.add(g);
     }
 
-    // Populate the 6 City Blocks between the streets
     for (let r = 0; r < 2; r++) {
       for (let c = 0; c < 3; c++) {
         const cx = (colsX[c] + colsX[c + 1]) / 2;
         const cz = (rowsZ[r] + rowsZ[r + 1]) / 2;
 
-        // Low-Poly Campus Building inside each block
-        const bHeight = 5.5 + ((r + c) % 3) * 2.5;
+        const bHeight = 5.0 + ((r + c) % 3) * 2.2;
         const bldg = new THREE.Mesh(
-          new THREE.BoxGeometry(11, bHeight, 10),
+          new THREE.BoxGeometry(10.5, bHeight, 9.5),
           new THREE.MeshLambertMaterial({ color: 0xdff9fb, flatShading: true })
         );
-        bldg.position.set(cx - 2, bHeight / 2, cz);
+        bldg.position.set(cx - 1.8, bHeight / 2, cz);
         bldg.castShadow = true;
         bldg.receiveShadow = true;
         scene.add(bldg);
 
-        // Roof accent
         const roof = new THREE.Mesh(
-          new THREE.BoxGeometry(11.6, 0.7, 10.6),
+          new THREE.BoxGeometry(11.1, 0.65, 10.1),
           new THREE.MeshLambertMaterial({ color: 0x576574, flatShading: true })
         );
-        roof.position.set(cx - 2, bHeight + 0.35, cz);
+        roof.position.set(cx - 1.8, bHeight + 0.32, cz);
         scene.add(roof);
 
-        // Block Trees
-        createLowPolyTree(cx + 6.5, cz - 5.5, 1.0);
-        createLowPolyTree(cx + 6.5, cz + 5.5, 0.85);
+        createLowPolyTree(cx + 6.2, cz - 5.0, 0.95);
+        createLowPolyTree(cx + 6.2, cz + 5.0, 0.82);
       }
     }
 
@@ -454,7 +510,41 @@
       return "WEST (270°)";
     }
 
-    // --- 6. ALL 4 CASES Across the Multi-Block Street Grid ---
+    // --- 6. SINGLE PAUSE BUTTON & SIMULATION LOGIC ---
+    let isPaused = false;
+    let scheduledTasks = [];
+
+    function scheduleTask(delaySec, callback) {
+      scheduledTasks.push({ remaining: delaySec, callback });
+    }
+
+    function clearScheduledTasks() {
+      scheduledTasks = [];
+    }
+
+    function updatePauseUI() {
+      const topCircle = document.getElementById('hud-pause-circle');
+      if (isPaused) {
+        topCircle.innerText = '▶';
+        topCircle.classList.add('paused');
+      } else {
+        topCircle.innerText = '⏸';
+        topCircle.classList.remove('paused');
+      }
+    }
+
+    function togglePause() {
+      isPaused = !isPaused;
+      updatePauseUI();
+    }
+
+    window.addEventListener('keydown', (e) => {
+      if (e.code === 'Space' && e.target.tagName !== 'BUTTON') {
+        e.preventDefault();
+        togglePause();
+      }
+    });
+
     const groundTruthRoute = ['N00', 'N10', 'N11', 'N12', 'N22', 'N23'];
 
     const caseConfigs = {
@@ -470,7 +560,7 @@
         route: groundTruthRoute,
         speed: 19.5,
         pressSet: new Set(['N00']),
-        branches: "18+ Possible Block Paths!"
+        branches: "18+ Block Paths"
       },
       3: {
         title: "Case 3: Press Every Button While Running Across Blocks — 100% Ground-Truth Verified",
@@ -484,11 +574,11 @@
         route: groundTruthRoute,
         speed: 21.5,
         pressSet: new Set(['N00', 'N11', 'N23']),
-        branches: "1 (Recovered via Camera + Graph)"
+        branches: "1 (Camera + Graph)"
       }
     };
 
-    let activeCase = 2;
+    let activeCase = 4;
     let simTime = 0;
     let segIdx = 0;
     let segProgress = 0;
@@ -508,11 +598,19 @@
       if (id) document.getElementById(id).classList.add(cls);
     }
 
-    function startScenario(cNum) {
+    function startScenario(cNum, keepAutoQueue = false) {
+      if (!keepAutoQueue) autoQueue = [];
+      clearScheduledTasks();
+
+      if (isPaused) {
+        isPaused = false;
+        updatePauseUI();
+      }
+
       activeCase = cNum;
       const cfg = caseConfigs[cNum];
 
-      document.querySelectorAll('#controls-hud button').forEach(b => b.classList.remove('active-case'));
+      document.querySelectorAll('#bottom-bar button.ctrl-btn').forEach(b => b.classList.remove('active-case'));
       const btn = document.getElementById(`btn-c${cNum}`);
       if (btn) btn.classList.add('active-case');
 
@@ -533,7 +631,6 @@
         n.pulseRing.material.opacity = 0;
       });
 
-      // Draw faint blue Ground Truth route on the block streets for reference
       for (let i = 0; i < cfg.route.length - 1; i++) {
         drawOverlayBeam(cfg.route[i], cfg.route[i + 1], 0x3498db, 0.55, 0.25, 0.55);
       }
@@ -545,7 +642,7 @@
       analyzed = false;
       isRunning = true;
 
-      logMsg(`Started ${cfg.title}`);
+      logMsg(`Started Case ${cNum}`);
       handleNodeArrival(0);
     }
 
@@ -559,7 +656,6 @@
       const isMoving = cfg.speed > 0 && nextId !== null;
       const exitDir = getCompassDirection(nodeId, nextId);
 
-      // Update CCTV HUD
       node.camLocked = true;
       node.fovDisc.material.opacity = 0.45;
       document.getElementById('cam-id').innerText = `CAM_${nodeId}`;
@@ -574,7 +670,7 @@
         node.pulse = 1.0;
         highlightPill('pill-btn', 'active');
         logMsg(`[BUTTON + CAM] ${nodeId} pressed! Cam confirms ${isMoving ? 'MOVING ' + exitDir : 'STATIONARY'}.`);
-        setTimeout(() => { if (isRunning) highlightPill('pill-report', 'active'); }, 280);
+        scheduleTask(0.28, () => { if (isRunning) highlightPill('pill-report', 'active'); });
       } else {
         node.btnState = 'skipped';
         node.beacon.material.color.setHex(0xf39c12);
@@ -597,19 +693,16 @@
       if (activeCase === 1) {
         highlightPill('pill-analyze', 'alert');
         document.getElementById('m-recovery').innerText = "100% (Point Lock)";
-        logMsg(`[ANALYZER] CAM_N00 confirms subject is STATIONARY at N00. Zero street ambiguity.`);
+        logMsg(`[ANALYZER] CAM_N00 confirms subject is STATIONARY at N00.`);
       }
       else if (activeCase === 2) {
-        // Show why 1 Button + Move in a Block Grid is hard to trace!
         highlightPill('pill-analyze', 'alert');
-        document.getElementById('m-recovery').innerText = "20.0% (AMBIGUOUS GRID)";
-        logMsg(`[ANALYZER] CRITICAL: Only N00 pressed! CAM_N00 saw NORTH exit to N10, but subject never pressed N10!`);
-        logMsg(`[ANALYZER] At N10, street branches into 3 directions (N20, N11, N12...). Highlighting red unconfirmed search web!`);
+        document.getElementById('m-recovery').innerText = "20.0% (AMBIGUOUS)";
+        logMsg(`[ANALYZER] Only N00 pressed! CAM_N00 saw NORTH exit to N10, then lost button pings.`);
+        logMsg(`[ANALYZER] Highlighting red unconfirmed branching web across blocks!`);
 
-        // Confirmed initial camera vector N00 -> N10
         drawOverlayBeam('N00', 'N10', 0x00d2d3, 1.2, 0.52);
 
-        // Draw Red Ambiguous Branching Web across the city blocks
         const ambiguousEdges = [
           ['N10', 'N20'], ['N20', 'N21'], ['N10', 'N11'], ['N11', 'N01'],
           ['N11', 'N21'], ['N11', 'N12'], ['N12', 'N02'], ['N12', 'N22'],
@@ -619,17 +712,17 @@
       }
       else if (activeCase === 3) {
         highlightPill('pill-analyze', 'active');
-        document.getElementById('m-recovery').innerText = "100.0% (All Verified)";
-        logMsg(`[ANALYZER] Every block intersection button pressed + verified by CCTV. Exact path locked.`);
+        document.getElementById('m-recovery').innerText = "100.0% (Verified)";
+        logMsg(`[ANALYZER] All block intersection buttons pressed + verified by CCTV.`);
         for (let i = 0; i < cfg.route.length - 1; i++) {
           drawOverlayBeam(cfg.route[i], cfg.route[i + 1], 0x2ecc71, 1.25, 0.55);
         }
       }
       else if (activeCase === 4) {
         highlightPill('pill-analyze', 'active');
-        document.getElementById('m-recovery').innerText = "100.0% (Graph + Cam Inferred)";
-        logMsg(`[ANALYZER] Buttons pressed at N00, N11, N23 (Skipped N10, N12, N22).`);
-        logMsg(`[ANALYZER] Combining CAM_N00 (NORTH exit) + CAM_N11 (EAST exit) + Shortest-Path Graph -> Full Route Recovered!`);
+        document.getElementById('m-recovery').innerText = "100.0% (Recovered)";
+        logMsg(`[ANALYZER] Pressed N00, N11, N23 (Skipped N10, N12, N22).`);
+        logMsg(`[ANALYZER] Camera Exit Vectors + Graph Dijkstra reconstructed full route!`);
 
         const checkpoints = ['N00', 'N11', 'N23'];
         for (let i = 0; i < checkpoints.length - 1; i++) {
@@ -642,8 +735,8 @@
     }
 
     function playAllCases() {
-      autoQueue = [1, 2, 3, 4];
-      startScenario(autoQueue.shift());
+      autoQueue = [2, 3, 4];
+      startScenario(1, true);
     }
 
     function toggleCameraView() {
@@ -681,19 +774,33 @@
     const clock = new THREE.Clock();
     function animate() {
       requestAnimationFrame(animate);
-      const dt = clock.getDelta();
+      const rawDt = clock.getDelta();
+      const dt = isPaused ? 0 : rawDt;
+
+      if (!isPaused && scheduledTasks.length > 0) {
+        for (let i = scheduledTasks.length - 1; i >= 0; i--) {
+          scheduledTasks[i].remaining -= dt;
+          if (scheduledTasks[i].remaining <= 0) {
+            const fn = scheduledTasks[i].callback;
+            scheduledTasks.splice(i, 1);
+            fn();
+          }
+        }
+      }
+
       simTime += dt;
 
-      if (isRunning) {
+      if (isRunning && !isPaused) {
         const cfg = caseConfigs[activeCase];
         document.getElementById('speed-val').innerText = cfg.speed.toFixed(1);
 
         if (activeCase === 1) {
-          // Stationary pulse at N00
           if (simTime > 2.6 && !analyzed) {
             runBlockPathAnalyzer();
             isRunning = false;
-            if (autoQueue.length > 0) setTimeout(() => startScenario(autoQueue.shift()), 2800);
+            if (autoQueue.length > 0) {
+              scheduleTask(2.8, () => startScenario(autoQueue.shift(), true));
+            }
           }
         } else {
           const uId = cfg.route[segIdx];
@@ -714,7 +821,9 @@
               document.getElementById('speed-val').innerText = "0.0";
               runBlockPathAnalyzer();
               isRunning = false;
-              if (autoQueue.length > 0) setTimeout(() => startScenario(autoQueue.shift()), 3400);
+              if (autoQueue.length > 0) {
+                scheduleTask(3.4, () => startScenario(autoQueue.shift(), true));
+              }
             }
           } else {
             runner.position.lerpVectors(p1, p2, segProgress);
@@ -726,24 +835,25 @@
         }
       }
 
-      // Rotate beacons, pan cameras toward runner, and expand pulse rings
-      Object.values(gridNodes).forEach(n => {
-        n.beacon.rotation.y += dt * 2.2;
-        if (n.camLocked) {
-          n.camHead.lookAt(runner.position);
-        }
-        if (n.pulse > 0) {
-          n.pulse -= dt * 0.75;
-          const s = 1 + (1 - n.pulse) * 3.8;
-          n.pulseRing.scale.set(s, s, 1);
-          n.pulseRing.material.opacity = Math.max(0, n.pulse);
-        }
-      });
+      if (!isPaused) {
+        Object.values(gridNodes).forEach(n => {
+          n.beacon.rotation.y += dt * 2.2;
+          if (n.camLocked) {
+            n.camHead.lookAt(runner.position);
+          }
+          if (n.pulse > 0) {
+            n.pulse -= dt * 0.75;
+            const s = 1 + (1 - n.pulse) * 3.8;
+            n.pulseRing.scale.set(s, s, 1);
+            n.pulseRing.material.opacity = Math.max(0, n.pulse);
+          }
+        });
+      }
 
-      // Camera View Interpolation
+      // Framed camera so the entire 3x4 grid fits comfortably inside the viewport
       if (viewMode === 'top') {
-        camera.position.lerp(new THREE.Vector3(0, 88, 62), 0.06);
-        camera.lookAt(0, 0, 2);
+        camera.position.lerp(new THREE.Vector3(0, 96, 68), 0.08);
+        camera.lookAt(0, 0, 0);
       } else {
         const chaseOffset = new THREE.Vector3(0, 16, 22);
         camera.position.lerp(runner.position.clone().add(chaseOffset), 0.1);
@@ -754,13 +864,12 @@
     }
 
     window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.aspect = viewport.clientWidth / viewport.clientHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setSize(viewport.clientWidth, viewport.clientHeight);
     });
 
-    // Launch directly in Case 2 so you can immediately see the multi-block ambiguity!
-    startScenario(2);
+    startScenario(4);
     animate();
   </script>
 </body>
